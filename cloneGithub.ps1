@@ -4,19 +4,22 @@ Param ($organisation)
 #Check for config file and Tokens
 $accessToken = ""
 $configPath = "$ENV:UserProfile\cloneGithub.json"
-if( Test-Path $configPath){
-    $configOutput = Get-Content $configPath | Out-String | ConvertFrom-Json
-    $accessToken = $configOutput.githubPersonalAccessToken
-}else{
+if(-Not (Test-Path $configPath)){
     $configOutput = ConvertTo-Json @{ githubPersonalAccessToken="YOUR GITHUB PERSONAL AUTH TOKEN"; }
     Out-File -FilePath $configPath  -InputObject $configOutput 
-    start $configPath
+    Start-Process $configPath
     return
+}else{
+    $configOutput = Get-Content $configPath | Out-String | ConvertFrom-Json
+    $accessToken = $configOutput.githubPersonalAccessToken
 }
 
-return
-mkdir $organisation
-pushd $organisation
+#does this user/org already have a directory?
+if(-Not (Test-Path $organisation)){
+    mkdir $organisation
+}
+
+Push-Location $organisation
 
 #Your GITHUB personal access token
 $url = "https://api.github.com/orgs/$organisation/repos?per_page=200&access_token=$accessToken"
@@ -33,4 +36,4 @@ try {
 (invoke-webrequest -Uri $url).Content | ConvertFrom-Json | %{$_.ssh_url}  | % {git clone $_}
 
 
-popd 
+Pop-Location 
