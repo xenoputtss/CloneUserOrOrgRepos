@@ -25,29 +25,34 @@ function doRepoWork {
 
     Push-Location $organisation
 
-    $url = "https://api.github.com/orgs/$organisation/repos?per_page=200&access_token=$accessToken"
+    $params = "per_page=200&type=all&sort=full_name"
 
+    $url = "https://api.github.com/orgs/$organisation/repos?$params&access_token=$accessToken"
     #Lazy way of determining if $organisation is a user or org
     try { 
-        Invoke-WebRequest invoke-webrequest -Uri $url 
+        Invoke-WebRequest -Uri $url 
     } catch {
-        $url = "https://api.github.com/users/$organisation/repos?per_page=200&access_token=$accessToken"
+        $url = "https://api.github.com/users/$organisation/repos?$params&access_token=$accessToken"
     }
 
-    # $url
     #Clone everything using SSH
+    $url
     $githubReponse = ((invoke-webrequest -Uri $url).Content | ConvertFrom-Json) 
+    # foreach($repo in $githubReponse){
+    #     $repo.name
+    # }
     foreach($repo in $githubReponse){
         #check if directory exists
         if(Test-Path $repo.name){
             #update repo
             "Updating "+$repo.name
             Push-Location $repo.name
-            %{git fetch --all}
+            %{git fetch --all --quiet}
             Pop-Location
         }else{
             #clone new repo
-            %{git clone $repo.ssh_url}
+            "Cloning New Repo " + $repo.name
+            %{git clone $repo.ssh_url  --quiet}  
         }
     # $repo.ssh_url
     }
