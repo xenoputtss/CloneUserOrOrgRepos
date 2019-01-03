@@ -1,6 +1,42 @@
 Param ($userRepo)
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 
+function cloneOrUpdateRepo{
+    Param ($repo)
+
+    #check if directory exists
+    if(Test-Path $repo.name){
+        #update repo
+        "Updating "+$repo.name
+        Push-Location $repo.name
+        %{git fetch --all --quiet}
+        Pop-Location
+    }else{
+        #clone new repo
+        "Cloning New Repo " + $repo.name
+        %{git clone $repo.ssh_url  --quiet}  
+    }
+}
+
+function doUserInfoCloneing($userName, $ApiKey){
+    #does the user already have a starred directory
+    if(-Not (Test-Path "starred")){
+        mkdir "starred"
+    }
+    Push-Location "starred"
+
+    $starUrl = "https://api.github.com/users/$userName/starred?access_token=$ApiKey"
+    $starUrl
+    $githubReponse = ((invoke-webrequest -Uri $starUrl).Content | ConvertFrom-Json) 
+
+
+    foreach($repo in $githubReponse){
+        $repo.name
+        cloneOrUpdateRepo $repo 
+    }
+    Pop-Location 
+}
+
 function doRepoWork {
     Param ($organisation)
         
@@ -26,36 +62,30 @@ function doRepoWork {
     Push-Location $organisation
 
     $params = "per_page=200&type=all&sort=full_name"
-
     $url = "https://api.github.com/orgs/$organisation/repos?$params&access_token=$accessToken"
+    $isUser = $false
     #Lazy way of determining if $organisation is a user or org
     try { 
         Invoke-WebRequest -Uri $url 
     } catch {
         $url = "https://api.github.com/users/$organisation/repos?$params&access_token=$accessToken"
+        $isUser=$true
     }
 
     #Clone everything using SSH
     $url
     $githubReponse = ((invoke-webrequest -Uri $url).Content | ConvertFrom-Json) 
-    # foreach($repo in $githubReponse){
-    #     $repo.name
-    # }
+
     foreach($repo in $githubReponse){
-        #check if directory exists
-        if(Test-Path $repo.name){
-            #update repo
-            "Updating "+$repo.name
-            Push-Location $repo.name
-            %{git fetch --all --quiet}
-            Pop-Location
-        }else{
-            #clone new repo
-            "Cloning New Repo " + $repo.name
-            %{git clone $repo.ssh_url  --quiet}  
-        }
-    # $repo.ssh_url
+        # $repo.name
+        cloneOrUpdateRepo $repo 
     }
+    
+    if ($isUser -eq $true) {
+        doUserInfoCloneing $organisation $accessToken
+    } 
+
+
 
     Pop-Location 
 }
